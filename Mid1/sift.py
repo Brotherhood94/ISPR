@@ -13,7 +13,7 @@ def process_file(load_path, save_path, mask_path = None):
         mask_path = cv2.cvtColor(cv2.imread(mask_path), cv2.COLOR_GRAY2RGB)
     img = cv2.imread(load_path, cv2.IMREAD_COLOR)
     gray = cv2.cvtColor(img, cv2.IMREAD_COLOR)
-    sift = cv2.xfeatures2d.SIFT_create()
+    sift = cv2.xfeatures2d.SIFT_create(200)
     kp = sift.detect(gray, mask_path) #Maske
     kp, des = sift.compute(gray,kp)
     img = cv2.drawKeypoints(gray,kp,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
