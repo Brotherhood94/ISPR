@@ -1,2 +1,5 @@
 #ignore dataset
 dataset/
+
+#ignore vscode setup
+.vscode
