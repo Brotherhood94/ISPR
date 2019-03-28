@@ -10,28 +10,21 @@ from pprint import pprint
 #Comparare keypoint a colori e gray?
 
 
-def process_file(load_path, save_path, mask_path = None):
-    if(mask_path is not None):
-        mask_path = cv2.cvtColor(cv2.imread(mask_path), cv2.COLOR_GRAY2RGB)
-    img = cv2.imread(load_path, cv2.IMREAD_COLOR)
-    gray = cv2.cvtColor(img, cv2.IMREAD_COLOR)
-    sift = cv2.xfeatures2d.SIFT_create(200)
-    kp = sift.detect(gray, mask_path) #Maske
-    kp, des = sift.compute(gray,kp)
-    img = cv2.drawKeypoints(gray,kp,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-    #print(kp)
-    #plt.plot(des)
-    plt.show()
-    cv2.imwrite(save_path, img)
+def process_file(load_path, save_path):
+    img = cv2.imread(load_path)
+    g_img =  cv2.cvtColor (img , cv2.COLOR_BGR2GRAY)
+    sift = cv2.xfeatures2d.SIFT_create(100)
+    kp, des = sift.detectAndCompute(g_img,None)
+    kp_img = cv2.drawKeypoints(g_img,kp,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    cv2.imwrite(save_path, kp_img)
 
 
 def start():
     dir = '/home/alessandro/Desktop/github/ISPR/Mid1/dataset/chosen/'
     saveDir = '/home/alessandro/Desktop/github/ISPR/Mid1/dataset/keypoints_chosen/'
-    maskDir = '/home/alessandro/Desktop/github/ISPR/Mid1/dataset/chosen/GT/'
     for file in os.listdir(dir):
         if file.endswith(".bmp"):
-            process_file(load_path=dir+''+file, save_path=saveDir+''+file, mask_path=maskDir+''+file+'_GT')
+            process_file(load_path=dir+''+file, save_path=saveDir+''+file)
 
 
 
@@ -86,8 +79,11 @@ https://www.learnopencv.com/histogram-of-oriented-gradients/
 #(int nfeatures=0, int nOctaveLayers=3, double contrastThreshold=0.04, double edgeThreshold=10, double sigma=1.6)
 def main():
     #Load an Image
-    img_path_detail='/home/alessandro/Desktop/github/ISPR/Mid1/dataset/chosen/1_2_s.bmp'
-    img_1 = cv2.imread(img_path_detail, cv2.COLOR_RGB2GRAY)  #GrayScale --> colors not relevant in the algorithm
+    img_path_1='/home/alessandro/Desktop/github/ISPR/Mid1/dataset/chosen/2_5_s.bmp'
+    img_path_2='/home/alessandro/Desktop/github/ISPR/Mid1/dataset/chosen/6_10_s.bmp'
+
+    img_1 = cv2.imread(img_path_1, cv2.COLOR_RGB2GRAY) 
+    img_2 = cv2.imread(img_path_2, cv2.COLOR_RGB2GRAY) 
 
     #SettingUp SIFT parameters
     nfeatures=200
@@ -96,10 +92,46 @@ def main():
     edgeThreshold=0.1
     sigma=20
 
-    sift = cv2.xfeatures2d.SIFT_create(10)
+    sift = cv2.xfeatures2d.SIFT_create(6)
 
-    keypoints, descriptors = sift.detectAndCompute(img_1, None)   
+    kp_1, des_1 = sift.detectAndCompute(img_1, None)   
+    kp_2, des_2 = sift.detectAndCompute(img_2, None) 
 
+    kp_img_1 = cv2.drawKeypoints(img_1,kp_1,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    kp_img_2 = cv2.drawKeypoints(img_2,kp_2,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+    fig, ax = plt.subplots()
+
+    index = np.arange(len(des_1[0]))
+    bar_width = 0.50
+    opacity = 0.4
+    error_config = {'ecolor': '0.3'}
+
+    rects1 = ax.bar(index, des_1[0], bar_width,
+                alpha=opacity, color='b', error_kw=error_config,
+                label='Tree')
+
+    rects2 = ax.bar(index + bar_width, des_2[5], bar_width,
+                alpha=opacity, color='r', error_kw=error_config,
+                label='Face')
+
+    ax.set_xlabel('Descriptor Vectors')
+    ax.legend()
+    fig.tight_layout()
+
+    plt.show()
+    plt.imshow(kp_img_1)
+
+    plt.show()
+    plt.imshow(kp_img_2)
+
+    plt.show()
+
+
+
+
+
+'''
     print('keypoints---------------')
     print(len(keypoints))
     print(keypoints[0].pt)
@@ -128,7 +160,7 @@ def main():
     
     plt.show()
 
-    
+    '''
 
 '''
     img_path_all='/home/alessandro/Desktop/github/ISPR/Mid1/dataset/keypoints_chosen/2_5_s.bmp'
@@ -158,8 +190,44 @@ def main():
     cv2.destroyAllWindows()
 '''
 
+def compare():
+    img_path_detail='/home/alessandro/Desktop/github/ISPR/waldo_hat.png'
+    img_path_entire='/home/alessandro/Desktop/github/ISPR/waldoscen2.jpg'
+
+    img_detail = cv2.imread(img_path_detail)
+    img_detail =  cv2.cvtColor (img_detail, cv2.COLOR_BGR2GRAY)
+
+    img_entire = cv2.imread(img_path_entire, cv2.COLOR_RGB2GRAY) 
+    img_entire =  cv2.cvtColor (img_entire, cv2.COLOR_BGR2GRAY)
+
+    #SettingUp SIFT parameters
+    nfeatures=100
+    nOctaveLayers=20
+    contrastThreshold=0.2
+    edgeThreshold=0.8
+    sigma=20
+
+    sift = cv2.xfeatures2d.SIFT_create(
+                                        sigma=sigma)
+
+    kp_detail, des_detail = sift.detectAndCompute(img_detail, None)   
+    kp_entire, des_entire = sift.detectAndCompute(img_entire, None) 
+
+    kp_img_detail = cv2.drawKeypoints(img_detail,kp_detail,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    kp_img_entire = cv2.drawKeypoints(img_entire,kp_entire,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+    bf = cv2.BFMatcher()
+    matches = bf.match(des_detail,des_entire)
+    matches = sorted(matches, key = lambda m: m.distance)
+
+    matching_result = cv2.drawMatches(kp_img_detail, kp_detail, kp_img_entire, kp_entire, matches[:100], None)
+    cv2.imshow("Matching", matching_result)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
-main()
+#main()
+#start()
+compare()
 
 
