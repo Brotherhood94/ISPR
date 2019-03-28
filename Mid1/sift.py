@@ -12,7 +12,7 @@ from pprint import pprint
 
 def process_file(load_path, save_path):
     img = cv2.imread(load_path)
-    g_img =  cv2.cvtColor (img , cv2.COLOR_BGR2GRAY)
+    g_img = cv2.cvtColor (img, cv2.COLOR_BGR2GRAY)
     sift = cv2.xfeatures2d.SIFT_create(100)
     kp, des = sift.detectAndCompute(g_img,None)
     kp_img = cv2.drawKeypoints(g_img,kp,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
