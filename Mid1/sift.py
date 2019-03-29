@@ -82,51 +82,53 @@ def main():
     img_path_1='/home/alessandro/Desktop/github/ISPR/Mid1/dataset/chosen/2_5_s.bmp'
     img_path_2='/home/alessandro/Desktop/github/ISPR/Mid1/dataset/chosen/6_10_s.bmp'
 
-    img_1 = cv2.imread(img_path_1, cv2.COLOR_RGB2GRAY) 
-    img_2 = cv2.imread(img_path_2, cv2.COLOR_RGB2GRAY) 
+    img_1 = cv2.imread(img_path_1) 
+    g_img_1 = cv2.cvtColor (img_1, cv2.COLOR_BGR2GRAY)
 
-    #SettingUp SIFT parameters
-    nfeatures=200
-    nOctaveLayers=2
-    contrastThreshold=0.1
-    edgeThreshold=0.1
-    sigma=20
+    img_2 = cv2.imread(img_path_2)
+    g_img_2 = cv2.cvtColor (img_2, cv2.COLOR_BGR2GRAY)
 
-    sift = cv2.xfeatures2d.SIFT_create(6)
 
-    kp_1, des_1 = sift.detectAndCompute(img_1, None)   
-    kp_2, des_2 = sift.detectAndCompute(img_2, None) 
+    sift = cv2.xfeatures2d.SIFT_create(19)
 
-    kp_img_1 = cv2.drawKeypoints(img_1,kp_1,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-    kp_img_2 = cv2.drawKeypoints(img_2,kp_2,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    kp_1, des_1 = sift.detectAndCompute(g_img_1, None)   
+    kp_2, des_2 = sift.detectAndCompute(g_img_2, None) 
+
+    kp_img_1 = cv2.drawKeypoints(g_img_1,kp_1,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    kp_img_2 = cv2.drawKeypoints(g_img_2,kp_2,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
     fig, ax = plt.subplots()
 
     index = np.arange(len(des_1[0]))
-    bar_width = 0.50
+    bar_width = 0.40
     opacity = 0.4
     error_config = {'ecolor': '0.3'}
-
-    rects1 = ax.bar(index, des_1[0], bar_width,
+    
+    ax.bar(index, des_1[18], bar_width,
                 alpha=opacity, color='b', error_kw=error_config,
                 label='Tree')
 
-    rects2 = ax.bar(index + bar_width, des_2[5], bar_width,
+    ax.bar(index + bar_width, des_2[18], bar_width,
                 alpha=opacity, color='r', error_kw=error_config,
                 label='Face')
-
+    '''
+    x = np.linspace(0, 128, 128)
+    plt.plot(x, des_1[18], label='Tree')
+    plt.plot(x, des_2[18], label='Face')
+    '''
     ax.set_xlabel('Descriptor Vectors')
     ax.legend()
     fig.tight_layout()
-
+    
     plt.show()
     plt.imshow(kp_img_1)
 
     plt.show()
     plt.imshow(kp_img_2)
-
+    
     plt.show()
-
+    cv2.imwrite('/home/alessandro/Desktop/isprImages/kp_img_1_barplot.bmp', kp_img_1)
+    cv2.imwrite('/home/alessandro/Desktop/isprImages/kp_img_2_barplot.bmp', kp_img_2)
 
 
 
@@ -139,56 +141,7 @@ def main():
     print(keypoints[0].size)
     print(keypoints[0].angle)
     #keypoints = sorted(keypoints, key = lambda m: m.size)
-
-    print('descriptors---------------')
-    print(len(descriptors))
-    print(descriptors[0])
-    print(descriptors[0].shape)
-    plt.figure(figsize=(13,5))
-    plt.subplot(1, 2, 1)
-
-    plt.bar(np.arange(len(descriptors[0])),descriptors[0])
-    #plt.xticks(180, descriptors)
-    #plt.hist(descriptors[0], bins=9)
-    img_1 = cv2.drawKeypoints(img_1, keypoints, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-    plt.subplot(1, 2, 2)
-    plt.imshow(img_1)
-    plt.figure(figsize=(21,3))
-    for x in range(1,len(descriptors)):
-        plt.subplot(1, len(descriptors), x)
-        plt.bar(np.arange(len(descriptors[x-1])),descriptors[x-1])
-    
-    plt.show()
-
     '''
-
-'''
-    img_path_all='/home/alessandro/Desktop/github/ISPR/Mid1/dataset/keypoints_chosen/2_5_s.bmp'
-
-    img_2 = cv2.imread(img_path_all, cv2.IMREAD_COLOR)  #GrayScale --> colors not relevant in the algorithm
-    keypoints2, descriptors2 = sift.detectAndCompute(img_2, None)
-
-    bf = cv2.BFMatcher()
-    matches = bf.match(descriptors,descriptors2)
-    print(len(matches))
-    print(matches[:3])
-    print(matches[0].distance)
-    matches = sorted(matches, key = lambda m: m.distance)
-    print(matches[0].distance)
-
-
-    
-    matching_result = cv2.drawMatches(img_1, keypoints, img_2, keypoints2, matches[:100], None)
-    cv2.imshow("Matching", matching_result)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-'''
-
-'''
-    cv2.imshow("Image", img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-'''
 
 def compare():
     img_path_detail='/home/alessandro/Desktop/github/ISPR/waldo_hat.png'
@@ -207,8 +160,7 @@ def compare():
     edgeThreshold=0.8
     sigma=20
 
-    sift = cv2.xfeatures2d.SIFT_create(
-                                        sigma=sigma)
+    sift = cv2.xfeatures2d.SIFT_create()
 
     kp_detail, des_detail = sift.detectAndCompute(img_detail, None)   
     kp_entire, des_entire = sift.detectAndCompute(img_entire, None) 
@@ -226,8 +178,8 @@ def compare():
     cv2.destroyAllWindows()
 
 
-#main()
+main()
 #start()
-compare()
+#compare()
 
 
