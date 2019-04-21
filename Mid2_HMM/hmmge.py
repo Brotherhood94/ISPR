@@ -11,44 +11,43 @@ def load_csv(file):
     return pd.read_csv(file)
 
 def plotTimeSerie(time, visible, hidden):
-#    print(time)
-#    print(hidden_states)
     sns.lineplot(data=hidden, color="coral", label="hidden")
-    sns.lineplot(data=visible, color="blue", label="visible")
-
+    ax2 = plt.twinx()
+    sns.scatterplot(data=visible, color="blue", label="visible", ax=ax2)
 #    plt.xticks(np.arange(len(time)), time)
-#    plt.xticks(rotation=90)
+#    plt.xticks(rotation=180)
     plt.show()
 
 def split_train_test(data, ratio):
-    print('Data size: '+str(len(data)))
-    print('Splitting size: '+str(ratio))
     split_index = int(len(data)*ratio)
     print('split_index :'+str(split_index))
     return data[0:split_index], data[split_index+1::]
 
 def main():
     data = load_csv('./dataset/energydata_complete.csv')
-    ratio = 2/3
-    sample_size = 100
-    hidden_states_count = 4 
+    ratio = 20/21 
+    sample_size = 400
+    hidden_states_count = 4
 
     #Reshaping dat
     train_lights, test_lights = split_train_test(data['lights'].values.reshape(-1, 1), ratio)
     train_appliances, test_appliances = split_train_test(data['Appliances'].values.reshape(-1, 1), ratio)
     train_time, test_time = split_train_test(data['date'].values.reshape(-1, 1), ratio)
 
+#    print("Ciaooo: "+str(train_appliances)+str(train_appliances.size))
 
     #Create an HMM and fit it to data
-    model = GaussianHMM(algorithm='viterbi', n_components=hidden_states_count, covariance_type='full', n_iter=1000)
-    model.fit(train_appliances)
+    model = GaussianHMM(algorithm='viterbi', n_components=hidden_states_count, covariance_type='full', n_iter=10000)
+    model.fit(train_lights)
+
     #Decode the optimal sequence of internal hidden state (Viterbi)
-    hidden_states = model.predict(test_appliances)
+    hidden_states = model.predict(test_lights)
 
     #Generate new sample (visible, hidden)
     X, Z = model.sample(sample_size)
-    #X_log = [np.log(y) for y in X]
-    print("Model Score:", np.exp(model.score(Z)))
-    plotTimeSerie(test_time, X, Z)
+    print("Model Score:", model.score_samples(X))
+    print(model.transmat_)
+
+    plotTimeSerie(test_time, test_lights, hidden_states)
 
 main()
