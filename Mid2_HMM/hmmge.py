@@ -2,6 +2,7 @@
 #Capire cosa è sto ground truth
 #rappresentare il grafo degli stati
 #plottare bitcoin
+#con5 fit the noise si vede dalla gaussian
 #https://waterprogramming.wordpress.com/2018/07/03/fitting-hidden-markov-models-part-ii-sample-python-script/
 #https://turing.ml/tutorials/4-bayeshmm/
 #https://rdrr.io/cran/seqHMM/man/plot.hmm.html
@@ -22,11 +23,12 @@ def split_train_test(data, ratio):
     split_index = int(len(data)*ratio)
     return data[0:split_index], data[split_index+1::]
 
-def plot_gaussians(data, model):
+def plot_gaussians(data, model, title):
     values = []
     sns.set()
     fig = plt.figure()
     ax = fig.add_subplot(111)
+    ax.set_title(title)
     print('\nMeans and Variances of hidden states:')
     for i in range(model.n_components):
         no_hidden = i
@@ -39,13 +41,8 @@ def plot_gaussians(data, model):
         print('---- Mu = ', mean)
         print('---- Sigma = ', sigma)
     
-    ax.hist(data, bins=30, density=True)
-    i = 0
+    ax.hist(data, bins=50, density=True)
     for item in values:
-        print(item['mean'])
-        if i < 0:
-            i = i + 1
-            continue
         ax.plot(item['x'], stats.norm.pdf(item['x'], item['mean'], item['sigma']))
     plt.show()    
 
@@ -60,7 +57,7 @@ def plot_time_series(visible, hidden, time=None, title=None):
     sns.lineplot(data=visible, legend=None)
     ax = sns.scatterplot(data=df, x='time', y='visible', hue='hidden', zorder=10)
     ax.set_title(title)
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(60))
     plt.xticks(rotation=90)
     plt.show()
 
@@ -71,8 +68,8 @@ def hidden_markov_model(hidden_states_count, train, test, time, sample_size, dat
     
     #Decode the optimal sequence of internal hidden state (Viterbi)
     hidden_states = model.predict(test)
-#    plot_time_series(test, hidden_states, time, data_name+' - Predict')
-    plot_gaussians(train, model)
+    plot_time_series(test, hidden_states, time, data_name+' - Predict')
+    plot_gaussians(train, model, data_name+' - Gaussian Predict')
 
     prob_next_step = model.transmat_[hidden_states[-1], :]
     print('Next Step '+str(prob_next_step))
@@ -88,7 +85,7 @@ def main():
     data = load_csv('./dataset/energydata_complete.csv')
     ratio = 4/5 
     sample_size = 100
-    hidden_states_count = 10 
+    hidden_states_count = 3 
 
     #Reshaping data
     train_lights, test_lights = split_train_test(data['lights'].values.reshape(-1, 1), ratio)
@@ -99,7 +96,7 @@ def main():
 #    data_lights = np.column_stack([data['lights']])
 #    data_appliaces = np.column_stack(data['Appliances'])
 
-#    hidden_markov_model(hidden_states_count, train_lights, test_lights, test_time, sample_size, 'Lights')
+    hidden_markov_model(hidden_states_count, train_lights, test_lights, test_time, sample_size, 'Lights')
     hidden_markov_model(hidden_states_count, train_appliances, test_appliances, test_time, sample_size, 'Appliances')
 
 main()
