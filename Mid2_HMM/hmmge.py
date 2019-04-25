@@ -15,6 +15,11 @@ import seaborn as sns
 import scipy.stats as stats
 import math
 
+flatui = ["#9b59b6", "#3498db", "#e74c3c", "#34495e", "#2ecc71"]
+
+
+
+
 def load_csv(file):
     return pd.read_csv(file)
 
@@ -22,6 +27,7 @@ def load_csv(file):
 def split_train_test(data, ratio):
     split_index = int(len(data)*ratio)
     return data[0:split_index], data[split_index+1::]
+
 
 def plot_gaussians(data, model, title):
     values = []
@@ -35,15 +41,15 @@ def plot_gaussians(data, model, title):
         mean = round(model.means_[i][0], 3)
         sigma = round(math.sqrt(np.diag(model.covars_[i])[0]), 3)
         x = np.linspace(mean - 3*sigma, mean + 3*sigma, 1000)
-        val = {'no':no_hidden, 'mean':mean, 'sigma':sigma, 'x':x}
+        val = {'no':no_hidden, 'mean':mean, 'sigma':sigma, 'x':x, 'color':flatui[i]}
         values.append(val)
         print('\nHidden state', no_hidden)
         print('---- Mu = ', mean)
-        print('---- Sigma = ', sigma)
-    
+        print('---- Sigma = ', sigma)    
     ax.hist(data, bins=50, density=True)
     for item in values:
-        ax.plot(item['x'], stats.norm.pdf(item['x'], item['mean'], item['sigma']))
+        ax.plot(item['x'], stats.norm.pdf(item['x'], item['mean'], item['sigma']), color=item['color'], label='hidden state '+str(item['no']))
+    plt.legend()
     plt.show()    
 
 
@@ -55,7 +61,7 @@ def plot_time_series(visible, hidden, time=None, title=None):
         time = [x[5:len(x)-3] for x in time[:, 0].tolist()]
     df = pd.DataFrame(dict(visible=visible[:, 0].tolist(), hidden=hidden.tolist(), time=time))
     sns.lineplot(data=visible, legend=None)
-    ax = sns.scatterplot(data=df, x='time', y='visible', hue='hidden', zorder=10)
+    ax = sns.scatterplot(data=df, x='time', y='visible', hue='hidden', palette=flatui, zorder=10)
     ax.set_title(title)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(60))
     plt.xticks(rotation=90)
@@ -72,7 +78,7 @@ def hidden_markov_model(hidden_states_count, train, test, time, sample_size, dat
     plot_gaussians(train, model, data_name+' - Gaussian Predict')
 
     prob_next_step = model.transmat_[hidden_states[-1], :]
-    print('Next Step '+str(prob_next_step))
+    print('\nNext Step '+str(prob_next_step))
 
     #Generate new sample (visible, hidden)
     X, Z = model.sample(sample_size)
@@ -83,9 +89,10 @@ def hidden_markov_model(hidden_states_count, train, test, time, sample_size, dat
 
 def main():
     data = load_csv('./dataset/energydata_complete.csv')
+#    data = load_csv('./dataset/BTC-USD.csv')
     ratio = 4/5 
     sample_size = 100
-    hidden_states_count = 3 
+    hidden_states_count = 5 
 
     #Reshaping data
     train_lights, test_lights = split_train_test(data['lights'].values.reshape(-1, 1), ratio)
