@@ -14,10 +14,9 @@ import matplotlib.ticker as ticker
 import seaborn as sns
 import scipy.stats as stats
 import math
+import networkx as nx
 
 flatui = ["#9b59b6", "#3498db", "#e74c3c", "#34495e", "#2ecc71"]
-
-
 
 
 def load_csv(file):
@@ -53,15 +52,15 @@ def plot_gaussians(data, model, title):
     plt.show()    
 
 
-def plot_time_series(visible, hidden, time=None, title=None):
+def plot_time_series(visible, hidden, states, time=None, title=None):
     sns.set_style("whitegrid")
     if time is None:
         time = np.arange(len(visible))
     else:
         time = [x[5:len(x)-3] for x in time[:, 0].tolist()]
     df = pd.DataFrame(dict(visible=visible[:, 0].tolist(), hidden=hidden.tolist(), time=time))
-    sns.lineplot(data=visible, legend=None)
-    ax = sns.scatterplot(data=df, x='time', y='visible', hue='hidden', palette=flatui, zorder=10)
+    sns.lineplot(data=visible, palette='PuBuGn_d', legend=None)
+    ax = sns.scatterplot(data=df, x='time', y='visible', hue='hidden', palette=flatui[0:states], zorder=10)
     ax.set_title(title)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(60))
     plt.xticks(rotation=90)
@@ -74,15 +73,17 @@ def hidden_markov_model(hidden_states_count, train, test, time, sample_size, dat
     
     #Decode the optimal sequence of internal hidden state (Viterbi)
     hidden_states = model.predict(test)
-    plot_time_series(test, hidden_states, time, data_name+' - Predict')
+
+    plot_time_series(test, hidden_states, hidden_states_count, time, data_name+' - Predict')
     plot_gaussians(train, model, data_name+' - Gaussian Predict')
 
+    #Prob next step
     prob_next_step = model.transmat_[hidden_states[-1], :]
     print('\nNext Step '+str(prob_next_step))
 
     #Generate new sample (visible, hidden)
     X, Z = model.sample(sample_size)
-    plot_time_series(X, Z, title=data_name+' - Sample')
+    plot_time_series(X, Z, hidden_states_count, title=data_name+' - Sample')
 #    print("\nModel Score:", model.score_samples(X))
     print(model.transmat_)
 
@@ -92,7 +93,7 @@ def main():
 #    data = load_csv('./dataset/BTC-USD.csv')
     ratio = 4/5 
     sample_size = 100
-    hidden_states_count = 5 
+    hidden_states_count = 3 
 
     #Reshaping data
     train_lights, test_lights = split_train_test(data['lights'].values.reshape(-1, 1), ratio)
@@ -104,6 +105,6 @@ def main():
 #    data_appliaces = np.column_stack(data['Appliances'])
 
     hidden_markov_model(hidden_states_count, train_lights, test_lights, test_time, sample_size, 'Lights')
-    hidden_markov_model(hidden_states_count, train_appliances, test_appliances, test_time, sample_size, 'Appliances')
+#    hidden_markov_model(hidden_states_count, train_appliances, test_appliances, test_time, sample_size, 'Appliances')
 
 main()
