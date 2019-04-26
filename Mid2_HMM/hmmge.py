@@ -1,8 +1,3 @@
-#Osservazione sulla media e varianza degli hidden state!! Fare il confronto frafico tirando fuori le gaussiane da entrambi predict/sample
-#Capire cosa è sto ground truth
-#rappresentare il grafo degli stati
-#plottare bitcoin
-#con5 fit the noise si vede dalla gaussian
 #https://waterprogramming.wordpress.com/2018/07/03/fitting-hidden-markov-models-part-ii-sample-python-script/
 #https://turing.ml/tutorials/4-bayeshmm/
 #https://rdrr.io/cran/seqHMM/man/plot.hmm.html
