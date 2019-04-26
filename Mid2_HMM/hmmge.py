@@ -14,7 +14,7 @@ import matplotlib.ticker as ticker
 import seaborn as sns
 import scipy.stats as stats
 import math
-import networkx as nx
+import os, sys
 
 flatui = ["#9b59b6", "#3498db", "#e74c3c", "#34495e", "#2ecc71"]
 
@@ -22,38 +22,38 @@ flatui = ["#9b59b6", "#3498db", "#e74c3c", "#34495e", "#2ecc71"]
 def load_csv(file):
     return pd.read_csv(file)
 
-
 def split_train_test(data, ratio):
     split_index = int(len(data)*ratio)
     return data[0:split_index], data[split_index+1::]
 
-
-def plot_gaussians(data, model, title):
+def get_points(model):
     values = []
-    sns.set()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.set_title(title)
-    print('\nMeans and Variances of hidden states:')
+    eigenvals, eigenvecs = np.linalg.eig(np.transpose(np.array(model.transmat_)))
+    one_eigval = np.argmin(np.abs(eigenvals-1))
+    pi = eigenvecs[:,one_eigval] / np.sum(eigenvecs[:,one_eigval])
     for i in range(model.n_components):
-        no_hidden = i
-        mean = round(model.means_[i][0], 3)
-        sigma = round(math.sqrt(np.diag(model.covars_[i])[0]), 3)
+        mean = model.means_[i][0]
+        sigma = math.sqrt(np.diag(model.covars_[i])[0])
         x = np.linspace(mean - 3*sigma, mean + 3*sigma, 1000)
-        val = {'no':no_hidden, 'mean':mean, 'sigma':sigma, 'x':x, 'color':flatui[i]}
-        values.append(val)
-        print('\nHidden state', no_hidden)
-        print('---- Mu = ', mean)
-        print('---- Sigma = ', sigma)    
-    ax.hist(data, bins=50, density=True)
-    for item in values:
-        ax.plot(item['x'], stats.norm.pdf(item['x'], item['mean'], item['sigma']), color=item['color'], label='hidden state '+str(item['no']))
+        values.append({'no': i, 'mean':mean, 'sigma':sigma, 'x':x, 'color':flatui[i], 'pi':pi[i]})
+    return values
+
+def plot_gaussians(data, points, states, title):
+    sns.set()
+    fig, ax = plt.subplots()
+    fig.set_size_inches(19.20, 10.80)
+    ax.set_title(title)
+    ax.hist(data, bins=60, density=True, color='black', alpha=0.3, linewidth=2)
+    for point in points:
+        ax.plot(point['x'], point['pi']*stats.norm.pdf(point['x'], point['mean'], point['sigma']), color=point['color'], label='hidden state '+str(point['no']))
     plt.legend()
-    plt.show()    
+    plt.savefig('./Results/'+str(states)+'/'+title+'.png', dpi=300)                                                                                                                                                                                    
+#    plt.show()    
 
 
 def plot_time_series(visible, hidden, states, time=None, title=None):
     sns.set_style("whitegrid")
+    fig = plt.figure(figsize=(19.20,10.80))
     if time is None:
         time = np.arange(len(visible))
     else:
@@ -64,9 +64,10 @@ def plot_time_series(visible, hidden, states, time=None, title=None):
     ax.set_title(title)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(60))
     plt.xticks(rotation=90)
-    plt.show()
+    plt.savefig('./Results/'+str(states)+'/'+title+'.png', dpi=300)
+#    plt.show()
 
-def hidden_markov_model(hidden_states_count, train, test, time, sample_size, data_name):
+def hidden_markov_model(hidden_states_count, train, test, time, sample_size, data_name, f):
     #Create an HMM and fit it to data
     model = GaussianHMM(algorithm='viterbi', n_components=hidden_states_count, covariance_type='diag', n_iter=10000)
     model.fit(train)
@@ -74,37 +75,45 @@ def hidden_markov_model(hidden_states_count, train, test, time, sample_size, dat
     #Decode the optimal sequence of internal hidden state (Viterbi)
     hidden_states = model.predict(test)
 
-    plot_time_series(test, hidden_states, hidden_states_count, time, data_name+' - Predict')
-    plot_gaussians(train, model, data_name+' - Gaussian Predict')
-
     #Prob next step
     prob_next_step = model.transmat_[hidden_states[-1], :]
-    print('\nNext Step '+str(prob_next_step))
 
     #Generate new sample (visible, hidden)
     X, Z = model.sample(sample_size)
+   
+    #Plot Data
+    plot_time_series(test, hidden_states, hidden_states_count, time, data_name+' - Predict')
+    points = get_points(model)
+    plot_gaussians(train, points, hidden_states_count, data_name+' - Gaussian Predict')
     plot_time_series(X, Z, hidden_states_count, title=data_name+' - Sample')
-#    print("\nModel Score:", model.score_samples(X))
-    print(model.transmat_)
-
+   
+    #Write Data
+    f.write('\n'+data_name+'\n')
+    f.write('Transition Matrix:\n'+str(model.transmat_)+'\n')
+    f.write('\nNext Step '+str(prob_next_step)+'\n')
+    for point in points:
+        f.write('\nHidden Variable NO° '+str(point['no'])+'\n\tMean: '+str(point['mean'])+'\n\tSigma: '+str(point['sigma'])+'\n')
+    f.write('\n#######################################\n')
+#    f.write("\nModel Score:"+str(model.score_samples(X)))
 
 def main():
     data = load_csv('./dataset/energydata_complete.csv')
 #    data = load_csv('./dataset/BTC-USD.csv')
-    ratio = 4/5 
+    ratio = 3/4 
     sample_size = 100
-    hidden_states_count = 3 
+    hidden_states_count = 5 
+    
+    os.mkdir('./Results/'+str(hidden_states_count))
+    f = open('./Results/'+str(hidden_states_count)+'/data.txt', 'w+')
 
     #Reshaping data
     train_lights, test_lights = split_train_test(data['lights'].values.reshape(-1, 1), ratio)
     train_appliances, test_appliances = split_train_test(data['Appliances'].values.reshape(-1, 1), ratio)
     train_time, test_time = split_train_test(data['date'].values.reshape(-1, 1), ratio)
 
-#    #Reshape v2
-#    data_lights = np.column_stack([data['lights']])
-#    data_appliaces = np.column_stack(data['Appliances'])
-
-    hidden_markov_model(hidden_states_count, train_lights, test_lights, test_time, sample_size, 'Lights')
-#    hidden_markov_model(hidden_states_count, train_appliances, test_appliances, test_time, sample_size, 'Appliances')
+    hidden_markov_model(hidden_states_count, train_lights, test_lights, test_time, sample_size, 'Lights', f)
+    hidden_markov_model(hidden_states_count, train_appliances, test_appliances, test_time, sample_size, 'Appliances', f)
+    
+    f.close()
 
 main()
