@@ -1,1 +1,0 @@
-recording macro q+<letter> stop: q, recall: q+<letter>
