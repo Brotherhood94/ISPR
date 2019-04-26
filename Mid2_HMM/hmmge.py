@@ -103,7 +103,7 @@ def main():
     sample_size = 100
     hidden_states_count = 5 
     
-    os.mkdir('./Results/'+str(hidden_states_count))
+    os.makedirs('./Results/'+str(hidden_states_count))
     f = open('./Results/'+str(hidden_states_count)+'/data.txt', 'w+')
 
     #Reshaping data
