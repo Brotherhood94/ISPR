@@ -42,7 +42,7 @@ def plot_gaussians(data, points, states, title):
     for point in points:
         ax.plot(point['x'], point['pi']*stats.norm.pdf(point['x'], point['mean'], point['sigma']), color=point['color'], label='hidden state '+str(point['no']))
     plt.legend()
-    plt.savefig('./Results/'+str(states)+'/'+title+'.png', dpi=300)                                                                                                                                                                                    
+    plt.savefig('./Results_B/'+str(states)+'/'+title+'.png', dpi=300)                                                                                                                                                                                    
 #    plt.show()    
 
 
@@ -55,16 +55,16 @@ def plot_time_series(visible, hidden, states, time=None, title=None):
         time = [x[5:len(x)-3] for x in time[:, 0].tolist()]
     df = pd.DataFrame(dict(visible=visible[:, 0].tolist(), hidden=hidden.tolist(), time=time))
     sns.lineplot(data=visible, palette='PuBuGn_d', legend=None)
-    ax = sns.scatterplot(data=df, x='time', y='visible', hue='hidden', palette=flatui[0:states], zorder=10)
+    ax = sns.scatterplot(data=df, x='time', y='visible', hue='hidden', palette='cubehelix', zorder=10)
     ax.set_title(title)
     ax.xaxis.set_major_locator(ticker.MultipleLocator(60))
     plt.xticks(rotation=90)
-    plt.savefig('./Results/'+str(states)+'/'+title+'.png', dpi=300)
+    plt.savefig('./Results_B/'+str(states)+'/'+title+'.png', dpi=300)
 #    plt.show()
 
 def hidden_markov_model(hidden_states_count, train, test, time, sample_size, data_name, f):
     #Create an HMM and fit it to data
-    model = GaussianHMM(algorithm='viterbi', n_components=hidden_states_count, covariance_type='diag', n_iter=10000)
+    model = GaussianHMM(algorithm='map', n_components=hidden_states_count, covariance_type='diag', n_iter=10000)
     model.fit(train)
     
     #Decode the optimal sequence of internal hidden state (Viterbi)
@@ -77,10 +77,10 @@ def hidden_markov_model(hidden_states_count, train, test, time, sample_size, dat
     X, Z = model.sample(sample_size)
    
     #Plot Data
-    plot_time_series(test, hidden_states, hidden_states_count, time, data_name+' - Predict')
+    plot_time_series(test, hidden_states, hidden_states_count, None, data_name+' - Predict')
     points = get_points(model)
     plot_gaussians(train, points, hidden_states_count, data_name+' - Gaussian Predict')
-    plot_time_series(X, Z, hidden_states_count, title=data_name+' - Sample')
+#    plot_time_series(X, Z, hidden_states_count, None, title=data_name+' - Sample')
    
     #Write Data
     f.write('\n'+data_name+'\n')
@@ -92,22 +92,21 @@ def hidden_markov_model(hidden_states_count, train, test, time, sample_size, dat
 #    f.write("\nModel Score:"+str(model.score_samples(X)))
 
 def main():
-    data = load_csv('./dataset/energydata_complete.csv')
-#    data = load_csv('./dataset/BTC-USD.csv')
-    ratio = 3/4 
+    data = load_csv('./dataset/BTC-USD.csv')
+    ratio = 4/5 
     sample_size = 100
-    hidden_states_count = 5 
+    hidden_states_count = 3 
     
-    os.makedirs('./Results/'+str(hidden_states_count))
-    f = open('./Results/'+str(hidden_states_count)+'/data.txt', 'w+')
+    os.makedirs('./Results_B/'+str(hidden_states_count))
+    f = open('./Results_B/'+str(hidden_states_count)+'/data.txt', 'w+')
 
     #Reshaping data
-    train_lights, test_lights = split_train_test(data['lights'].values.reshape(-1, 1), ratio)
-    train_appliances, test_appliances = split_train_test(data['Appliances'].values.reshape(-1, 1), ratio)
-    train_time, test_time = split_train_test(data['date'].values.reshape(-1, 1), ratio)
+    train_open, test_open = split_train_test(data['Open'].values.reshape(-1, 1), ratio)
+    train_close, test_close = split_train_test(data['Close'].values.reshape(-1, 1), ratio)
+    train_time, test_time = split_train_test(data['Date'].values.reshape(-1, 1), ratio)
 
-    hidden_markov_model(hidden_states_count, train_lights, test_lights, test_time, sample_size, 'Lights', f)
-    hidden_markov_model(hidden_states_count, train_appliances, test_appliances, test_time, sample_size, 'Appliances', f)
+    hidden_markov_model(hidden_states_count, np.log10(train_open), np.log10(test_open), test_time, sample_size, 'Open', f)
+    hidden_markov_model(hidden_states_count, np.log10(train_close), np.log10(test_close), test_time, sample_size, 'Close', f)
     
     f.close()
 
