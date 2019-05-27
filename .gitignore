@@ -1,5 +1,6 @@
 #ignore dataset
 dataset/
 Results/
+Results_B/
 #ignore vscode setup
 .vscode
