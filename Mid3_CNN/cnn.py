@@ -43,5 +43,6 @@ def main():
     labels_mapping = unpickle_label("./dataset/cifar-10-python/cifar-10-batches-py/batches.meta")
     print("Mapping Loaded..\n")
     numpytoimg(dict_train, labels_mapping, 49999)
+
 main()
 
