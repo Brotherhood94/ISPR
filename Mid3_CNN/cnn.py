@@ -4,9 +4,9 @@ import os, sys, fnmatch
 import numpy as np
 
 def unpickle(path, match):
-    res_data = np.empty((0,3072))
-    res_labels = np.ndarray([])
-    res_filenames = np.ndarray([])
+    res_data = np.empty((0,3072), np.uint8)
+    res_labels = np.empty((0), np.uint8)
+    res_filenames = np.empty((0), np.uint8)
     for file in os.listdir(path):
         if fnmatch.fnmatch(file, match):
             with open(path+file, 'rb') as fo:
@@ -14,9 +14,13 @@ def unpickle(path, match):
                 res_data = np.append(res_data, dict[b'data'], axis=0)
                 res_labels = np.append(res_labels, dict[b'labels'])
                 res_filenames = np.append(res_filenames, dict[b'filenames'])
-                print("########################")
-                print(dict[b'data'].shape)
-                print(res_data.shape)
+#                print("########################")
+                print(len(dict[b'filenames']))
+                print(len(dict[b'labels']))
+#                print(dict[b'data'][0])
+                print(len(res_filenames))
+                print(len(res_labels))
+#                print(res_data[0])
     return {'data' : res_data, 'labels' : res_labels, 'filenames' : res_filenames} 
 
 def numpytoimg(dataset, index):
@@ -30,11 +34,10 @@ def main():
     print("Train Loaded")
     dict_test = unpickle("./dataset/cifar-10-python/cifar-10-batches-py/", "test_batch")
     print("Test Loaded")
+    print("----------------")
 #    for x in res.keys():
 #        print(x)
-    numpytoimg(dict_train, 0)
+    numpytoimg(dict_train, 4)
     print("----------------")
-    print(dict_train['filenames'][40000])
-    print(dict_train['data'][40000])
 main()
 
