@@ -38,7 +38,7 @@ def unpickle_label(file):
 def numpytoimg(dataset, labels_mapping, index):
     img = dataset['data'][index]
     filename = dataset['filenames'][index].decode('utf8')
-    label_text = labels_mapping[dataset['labels'][index]]
+    label_text = labels_mapping[np.argmax(dataset['labels'][index], axis=0)]
     label_int = dataset['labels'][index]
     fig = plt.figure(filename)
     plt.title(label_text)
@@ -57,7 +57,7 @@ def main():
     dict_test = unpickle_set("./dataset/cifar-10-python/cifar-10-batches-py/", "test_batch", num_classes)
     print("Test Loaded..\n")
     #numpytoimg(dict_train, labels_mapping, 49999)
-   
+
     #Architecture
     model = Sequential()
     print(dict_train['data'].shape[1:])
@@ -65,21 +65,23 @@ def main():
     model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))
     model.add(Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu'))
     model.add(MaxPool2D(pool_size=(2,2), strides=(2,2)))
+    model.add(Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu'))
+    model.add(MaxPool2D(pool_size=(3,3), strides=(1,1)))
     model.add(Flatten())
-    #model.add(Dense(100, activation='relu'))
+    model.add(Dense(1000, activation='relu'))
     model.add(Dense(num_classes, activation='softmax'))
-##
+
     model.summary()
 
     #compile model using accuracy to measure model performance
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     #train the model
-    model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=3) 
-    y_new = model.predict(dict_test['data'][:4])
-    for i in range(dict_test['data'][:4]):
-        print("X=%s, Predicted=%s" % (dict_test['data'][:4], y_new[i]))
-        numpytoimg(dict_test, labels_mapping, i)
+    model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=5) 
+    y_new = model.predict(dict_test['data'][:6])
+    for i in range(0,6):
+        print("X=%s, Predicted=%s" % (dict_test['filenames'][i], labels_mapping[np.argmax(y_new[i], axis=0)]))
+        #numpytoimg(dict_test, labels_mapping, i)
 
 main()
 
