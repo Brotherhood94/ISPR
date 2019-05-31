@@ -9,9 +9,12 @@ import pickle
 from matplotlib import pyplot as plt
 import os, sys, fnmatch
 import numpy as np
+import tensorflow as tf
+import keras
 from keras.layers import Conv2D, Activation, MaxPool2D, Flatten, Dense 
-from keras.models import Sequential
-from keras import utils as np_utils
+from keras.models import Sequential, load_model
+from keras.utils.vis_utils import plot_model
+from keras import utils as np_utils, backend as K
 
 def unpickle_set(path, match, num_classes):
     res_data = np.empty((0,3072), np.uint8)
@@ -35,7 +38,33 @@ def unpickle_label(file):
             res_mapping = np.append(res_mapping, label.decode('utf8'))
     return res_mapping 
 
+def plot_data(history, metric, epochs, color1, color2):
+    plt.clf()
+    z = history.history[metric]
+    val_z = history.history['val_'+metric]
+    plt.plot(range(1,epochs+1), z, color=color1, label='Traning '+metric.capitalize())
+    plt.plot(range(1,epochs+1), val_z, color=color2, label='Validation '+metric.capitalize())
+    plt.title('Traning/Validation '+metric.capitalize())
+    plt.xlabel('Epochs')
+    plt.ylabel(metric.capitalize())
+    plt.legend()
+    return plt
+
+def save_data(model, history, epochs, batch_size, loss, acc, path):
+    path = path+'/Test_Loss:'+str(loss)+'_Test_accuracy:'+str(acc)+'_'+str(batch_size)+'_'+str(epochs)+'/'
+    try:  
+        os.mkdir(path)
+    except OSError:  
+        print ('Creation of the directory %s failed' % path)
+    else:  
+        print ('Successfully created the directory %s ' % path)
+    model.save_weights(path+'model.h5')
+    plot_data(history, 'loss', epochs, 'orange', 'blue').savefig(path+'loss.png')
+    plot_data(history, 'acc', epochs, 'red', 'green').savefig(path+'acc.png')
+    plot_model(model, to_file=path+'model_plot.png', show_shapes=True, show_layer_names=True)
+
 def numpytoimg(dataset, labels_mapping, index):
+    plt.clf()
     img = dataset['data'][index]
     filename = dataset['filenames'][index].decode('utf8')
     label_text = labels_mapping[np.argmax(dataset['labels'][index], axis=0)]
@@ -45,30 +74,45 @@ def numpytoimg(dataset, labels_mapping, index):
     plt.imshow(img)
     plt.show()
 
+
 def main():
+    #GPU infos
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    session = tf.Session(config=config)
+    keras.backend.set_session(session)
 
     #Load Dataset 
-    labels_mapping = unpickle_label("./dataset/cifar-10-python/cifar-10-batches-py/batches.meta")
+    labels_mapping = unpickle_label('./dataset/cifar-10-python/cifar-10-batches-py/batches.meta')
     num_classes = len(labels_mapping)
-    print("Mapping Loaded..\n")
-    print("N° classes: "+str(num_classes))
-    dict_train = unpickle_set("./dataset/cifar-10-python/cifar-10-batches-py/", "data_batch_*", num_classes)
-    print("Train Loaded..\n")
-    dict_test = unpickle_set("./dataset/cifar-10-python/cifar-10-batches-py/", "test_batch", num_classes)
-    print("Test Loaded..\n")
+    print('Mapping Loaded..\n')
+    print('N° classes: '+str(num_classes))
+    dict_train = unpickle_set('./dataset/cifar-10-python/cifar-10-batches-py/', 'data_batch_*', num_classes)
+    print('Train Loaded..\n')
+    dict_test = unpickle_set('./dataset/cifar-10-python/cifar-10-batches-py/', 'test_batch', num_classes)
+    print('Test Loaded..\n')
     #numpytoimg(dict_train, labels_mapping, 49999)
 
     #Architecture
     model = Sequential()
-    print(dict_train['data'].shape[1:])
     model.add(Conv2D(32, kernel_size=(1,1), strides=(1,1), activation='relu', input_shape=dict_train['data'].shape[1:]))
     model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))
+    
     model.add(Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu'))
     model.add(MaxPool2D(pool_size=(2,2), strides=(2,2)))
-    model.add(Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu'))
-    model.add(MaxPool2D(pool_size=(3,3), strides=(1,1)))
+    
+    model.add(Conv2D(64, kernel_size=(3,3), strides=(2,2), activation='relu'))
+    model.add(MaxPool2D(pool_size=(3,3), strides=(1,1))) 
+    
+    model.add(Conv2D(64, kernel_size=(1,1), strides=(1,1), activation='relu'))
+    model.add(MaxPool2D(pool_size=(1,1), strides=(1,1)))  
+    
+    model.add(Conv2D(128, kernel_size=(1,1), strides=(1,1), activation='relu'))
+    model.add(MaxPool2D(pool_size=(1,1), strides=(1,1)))  
+    
     model.add(Flatten())
-    model.add(Dense(1000, activation='relu'))
+    model.add(Dense(100, activation='relu'))
+    model.add(Dense(100, activation='relu'))
     model.add(Dense(num_classes, activation='softmax'))
 
     model.summary()
@@ -77,11 +121,22 @@ def main():
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     #train the model
-    model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=5) 
-    y_new = model.predict(dict_test['data'][:6])
-    for i in range(0,6):
-        print("X=%s, Predicted=%s" % (dict_test['filenames'][i], labels_mapping[np.argmax(y_new[i], axis=0)]))
-        #numpytoimg(dict_test, labels_mapping, i)
+    batch_size = 64
+    epochs = 3
+    history = model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=epochs, batch_size=batch_size, verbose=1) 
+
+
+    #y_new = model.predict(dict_test['data'][:6])
+    # for i in range(0,6):
+    #     print('X=%s, Predicted=%s' % (dict_test['filenames'][i], labels_mapping[np.argmax(y_new[i], axis=0)]))
+    #     numpytoimg(dict_test, labels_mapping, i)
+    
+    loss, acc = model.evaluate(dict_test['data'], dict_test['labels'])
+
+    print('Test loss:', loss)
+    print('Test accuracy:', acc)
+    save_data(model, history, epochs, batch_size, loss, acc, './models')
+
 
 main()
 
