@@ -76,7 +76,8 @@ def numpytoimg(dataset, labels_mapping, index):
 
 
 def main():
-    #GPU infos
+    #GPU checkup 
+    print("GPU info")
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
@@ -125,12 +126,6 @@ def main():
     epochs = 3
     history = model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=epochs, batch_size=batch_size, verbose=1) 
 
-
-    #y_new = model.predict(dict_test['data'][:6])
-    # for i in range(0,6):
-    #     print('X=%s, Predicted=%s' % (dict_test['filenames'][i], labels_mapping[np.argmax(y_new[i], axis=0)]))
-    #     numpytoimg(dict_test, labels_mapping, i)
-    
     loss, acc = model.evaluate(dict_test['data'], dict_test['labels'])
 
     print('Test loss:', loss)
