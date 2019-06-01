@@ -3,7 +3,8 @@
 #BUT Regularization becomes important as the number of parameters (weights) increase to avoid memorization and helping generalization of the feautures
 
 #https://towardsdatascience.com/cifar-10-image-classification-in-tensorflow-5b501f7dc77c
-
+#il dropout non si usa ne conv ma solo nei dense. Basta il batchnorm nei conv (dim screenshot)
+#fare un confronto in 8 epoche con dropout e basth norm (screen)
 #Output layes is a dense layer of 10 nodes (as there are 10 classes woth softmax
 import pickle 
 from matplotlib import pyplot as plt
@@ -11,7 +12,7 @@ import os, sys, fnmatch
 import numpy as np
 import tensorflow as tf
 import keras
-from keras.layers import Conv2D, Activation, MaxPool2D, Flatten, Dense 
+from keras.layers import BatchNormalization, Dropout, Conv2D, Activation, MaxPool2D, Flatten, Dense 
 from keras.models import Sequential, load_model
 from keras.utils.vis_utils import plot_model
 from keras import utils as np_utils, backend as K
@@ -96,24 +97,31 @@ def main():
 
     #Architecture
     model = Sequential()
-    model.add(Conv2D(32, kernel_size=(1,1), strides=(1,1), activation='relu', input_shape=dict_train['data'].shape[1:]))
+    model.add(Conv2D(32, kernel_size=(3,3), strides=(1,1), activation='relu', input_shape=dict_train['data'].shape[1:]))
     model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))
+    model.add(BatchNormalization()) 
     
     model.add(Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu'))
     model.add(MaxPool2D(pool_size=(2,2), strides=(2,2)))
+    model.add(BatchNormalization()) 
     
     model.add(Conv2D(64, kernel_size=(3,3), strides=(2,2), activation='relu'))
     model.add(MaxPool2D(pool_size=(3,3), strides=(1,1))) 
+    model.add(BatchNormalization()) 
     
     model.add(Conv2D(64, kernel_size=(1,1), strides=(1,1), activation='relu'))
     model.add(MaxPool2D(pool_size=(1,1), strides=(1,1)))  
+    model.add(BatchNormalization()) 
     
     model.add(Conv2D(128, kernel_size=(1,1), strides=(1,1), activation='relu'))
     model.add(MaxPool2D(pool_size=(1,1), strides=(1,1)))  
+    model.add(BatchNormalization()) 
     
     model.add(Flatten())
     model.add(Dense(100, activation='relu'))
+    model.add(Dropout(0.4))
     model.add(Dense(100, activation='relu'))
+    model.add(Dropout(0.4))
     model.add(Dense(num_classes, activation='softmax'))
 
     model.summary()
@@ -122,8 +130,8 @@ def main():
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     #train the model
-    batch_size = 64
-    epochs = 3
+    batch_size = 256 
+    epochs = 100 
     history = model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=epochs, batch_size=batch_size, verbose=1) 
 
     loss, acc = model.evaluate(dict_test['data'], dict_test['labels'])
