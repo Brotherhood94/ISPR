@@ -1,4 +1,8 @@
-#https://medium.com/@eternalzer0dayx/demystifying-convolutional-neural-networks-ca17bdc75559
+#éiù profonda la voglo fare, più problema del vanishing
+#Max pooling extracts the most important features like edges whereas, average pooling extracts features so smoothly. For image data, you can see the difference. Although both are used for same reason, I think max pooling is better for extracting the extreme features. 
+#In 2014, Springenber et al. published a paper entitled Striving for Simplicity: The All Convolutional Net which demonstrated that replacing pooling layers with strided convolutions can increase accuracy in some situations.
+#You may use dilated convolution when:You are working with higher resolution images but fine-grained details are still important
+#https://medium.com/@eternalzer0dagg/demystifying-convolutional-neural-networks-ca17bdc75559
 #Multiple Layer: 1 edeges, 2 shapes, 3 collction of edges, 4 collection  of shapes (es truck)
 #BUT Regularization becomes important as the number of parameters (weights) increase to avoid memorization and helping generalization of the feautures
 
@@ -80,7 +84,6 @@ def main():
     #GPU checkup 
     print("GPU info")
     config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
     keras.backend.set_session(session)
 
@@ -101,26 +104,24 @@ def main():
     model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))
     model.add(BatchNormalization()) 
     
-    model.add(Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu'))
-    model.add(MaxPool2D(pool_size=(2,2), strides=(2,2)))
+    model.add(Conv2D(64, kernel_size=(3,3), strides=(1,1), activation='relu'))
+    model.add(Conv2D(64, kernel_size=(3,3), strides=(1,1), activation='relu'))
+    model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))  
     model.add(BatchNormalization()) 
     
-    model.add(Conv2D(64, kernel_size=(3,3), strides=(2,2), activation='relu'))
-    model.add(MaxPool2D(pool_size=(3,3), strides=(1,1))) 
+    model.add(Conv2D(128, kernel_size=(3,3), strides=(2,2), activation='relu'))
+    model.add(Conv2D(128, kernel_size=(3,3), strides=(1,1), activation='relu'))
+    model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))  
+    model.add(BatchNormalization()) 
+     
+    model.add(Conv2D(256, kernel_size=(3,3), strides=(1,1), activation='relu'))
+    model.add(Conv2D(256, kernel_size=(3,3), strides=(1,1), activation='relu'))
+    model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))  
     model.add(BatchNormalization()) 
     
-    model.add(Conv2D(64, kernel_size=(1,1), strides=(1,1), activation='relu'))
-    model.add(MaxPool2D(pool_size=(1,1), strides=(1,1)))  
-    model.add(BatchNormalization()) 
-    
-    model.add(Conv2D(128, kernel_size=(1,1), strides=(1,1), activation='relu'))
-    model.add(MaxPool2D(pool_size=(1,1), strides=(1,1)))  
-    model.add(BatchNormalization()) 
     
     model.add(Flatten())
-    model.add(Dense(100, activation='relu'))
-    model.add(Dropout(0.4))
-    model.add(Dense(100, activation='relu'))
+    model.add(Dense(512, activation='relu'))
     model.add(Dropout(0.4))
     model.add(Dense(num_classes, activation='softmax'))
 
@@ -131,7 +132,7 @@ def main():
 
     #train the model
     batch_size = 256 
-    epochs = 100 
+    epochs = 20 
     history = model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=epochs, batch_size=batch_size, verbose=1) 
 
     loss, acc = model.evaluate(dict_test['data'], dict_test['labels'])
