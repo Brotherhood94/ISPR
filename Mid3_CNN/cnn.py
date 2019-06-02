@@ -188,12 +188,17 @@ def save_architecture(dict_train, dict_test, num_classes, labels_mapping):
     #Architecture
     input_tensor = Input((32, 32, 3))
     x = Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu', input_shape=dict_train['data'].shape[1:])(input_tensor) 
-    x = identity_block(x, 3, 32)
-    x = identity_block(x, 3, 64)
+    x = identity_block(x, 3, 32, 64)
+    x = MaxPool2D(pool_size=(2,2), strides=(2,2))(x)
+    x = identity_block(x, 3, 64, 128)
+    x = MaxPool2D(pool_size=(2,2), strides=(2,2))(x)
+    x = identity_block(x, 3, 128, 256)
+    x = MaxPool2D(pool_size=(2,2), strides=(2,2))(x)
+    x = identity_block(x, 3, 256)
     x = Flatten()(x)
-    x = Dense(1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
+    x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
     x = Dropout(0.4)(x)
-    x = Dense(1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
+    x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
     x = Dropout(0.4)(x)
     x = Dense(num_classes, activation='softmax')(x)
     model = Model(inputs=input_tensor, outputs=x)
@@ -231,7 +236,7 @@ def save_architecture(dict_train, dict_test, num_classes, labels_mapping):
 
     #train the model
     batch_size = 256 
-    epochs = 10 
+    epochs = 135 
     history = model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=epochs, batch_size=batch_size, verbose=1) 
 
     loss, acc = model.evaluate(dict_test['data'], dict_test['labels'])
