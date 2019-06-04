@@ -134,22 +134,25 @@ def load_architecture(path=None):
 
 def train_architecture(dict_train, dict_test, num_classes, labels_mapping, epochs=None, batch_size=None):
     #Architecture
+    n_layers = 4
     input_tensor = Input((32, 32, 3))
     x = Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu', input_shape=dict_train['data'].shape[1:])(input_tensor) 
-    x = identity_block(x, 3, 32)
-    x = identity_block(x, 3, 32)
-    x = identity_block(x, 3, 32)
-    x = identity_block(x, 3, 32)
-    x = identity_block(x, 3, 32, 64)
-    x = identity_block(x, 3, 64)
-    x = identity_block(x, 3, 64)
-    x = identity_block(x, 3, 64)
-    x = identity_block(x, 3, 64)
-    x = identity_block(x, 3, 64, 128)
-    x = identity_block(x, 3, 128) 
-    x = identity_block(x, 3, 128) 
-    x = identity_block(x, 3, 128) 
-    x = identity_block(x, 3, 128) 
+
+    for i in range(n_layers):
+        x = identity_block(x, 3, 32)
+        if i == n_layers-1
+            x = identity_block(x, 3, 32, 64)
+
+    for i in range(n_layers):
+        x = identity_block(x, 3, 64)
+        if i == n_layers-1
+            x = identity_block(x, 3, 64, 128)
+
+    for i in range(n_layers):
+        x = identity_block(x, 3, 128)
+        if i == n_layers-1
+            x = identity_block(x, 3, 64, 128)
+
     x = BatchNormalization(axis=3)(x)
     x = Activation('relu')(x)
     x = MaxPool2D(pool_size=(2,2), strides=(2,2))(x)
@@ -159,19 +162,16 @@ def train_architecture(dict_train, dict_test, num_classes, labels_mapping, epoch
     x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
     x = Dropout(0.2)(x)
     x = Dense(num_classes, activation='softmax')(x)
+
     model = Model(inputs=input_tensor, outputs=x)
-    
     model.summary()
-    
     opt = optimizers.Adam(lr = 0.0005, decay=1e-4) 
     model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
-
     history = model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=epochs, batch_size=batch_size, verbose=1) 
     loss, acc = model.evaluate(dict_test['data'], dict_test['labels'])
-
+    save_data(model, history, epochs, batch_size, loss, acc, './models')
     print('Test loss:', loss)
     print('Test accuracy:', acc)
-    save_data(model, history, epochs, batch_size, loss, acc, './models')
     return model
 
 def fast_gradient_sign_method(model, img, label, labels_mapping):
@@ -212,10 +212,10 @@ def main():
 
     #Train Model
 #    model = train_architecture(dict_train, dict_test, num_classes, labels_mapping, epochs=sys.argv[1], batch_size=sys.argv[2])
-#    model = load_architecture('./models/Test_Loss:1.5046686241149902_Test_accuracy:0.5522_256_10/')
+    model = load_architecture('./models/Test_Loss:1.5046686241149902_Test_accuracy:0.5522_256_10/')
 
     #Load Model
-    model = load_architecture('./models/Test_Loss:1.6799632623672485_Test_accuracy:0.7591_256_80/')
+#    model = load_architecture('./models/Test_Loss:1.6799632623672485_Test_accuracy:0.7591_256_80/')
 
     #FastGradientSign Attack
     fast_gradient_sign_method(model, dict_test['data'][0], dict_test['labels'][0], labels_mapping)
