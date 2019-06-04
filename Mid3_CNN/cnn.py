@@ -131,6 +131,12 @@ def load_architecture(path=None):
     model.load_weights(path+'model_weights.h5') 
     return model    
 
+def generate_layers(n_layers, input_tensor, kernel_size, filters):
+    for i in range(n_layers):
+        x = identity_block(x, kernel_size, filters)
+        if i == n_layers-1:
+            x = identity_block(x, kernel_size, filters, filters*2)
+    return x
 
 def train_architecture(dict_train, dict_test, num_classes, labels_mapping, epochs=None, batch_size=None):
     #Architecture
@@ -138,28 +144,17 @@ def train_architecture(dict_train, dict_test, num_classes, labels_mapping, epoch
     input_tensor = Input((32, 32, 3))
     x = Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu', input_shape=dict_train['data'].shape[1:])(input_tensor) 
 
-    for i in range(n_layers):
-        x = identity_block(x, 3, 32)
-        if i == n_layers-1
-            x = identity_block(x, 3, 32, 64)
-
-    for i in range(n_layers):
-        x = identity_block(x, 3, 64)
-        if i == n_layers-1
-            x = identity_block(x, 3, 64, 128)
-
-    for i in range(n_layers):
-        x = identity_block(x, 3, 128)
-        if i == n_layers-1
-            x = identity_block(x, 3, 64, 128)
+    generate_layers(n_layers, x, 3, 32) 
+    generate_layers(n_layers, x, 3, 64) 
+    generate_layers(n_layers, x, 3, 128) 
 
     x = BatchNormalization(axis=3)(x)
     x = Activation('relu')(x)
     x = MaxPool2D(pool_size=(2,2), strides=(2,2))(x)
     x = Flatten()(x)
-    x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
+    x = Dense(1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
     x = Dropout(0.2)(x)
-    x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
+    x = Dense(1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
     x = Dropout(0.2)(x)
     x = Dense(num_classes, activation='softmax')(x)
 
