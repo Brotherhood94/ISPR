@@ -11,7 +11,9 @@
 #il dropout non si usa ne conv ma solo nei dense. Basta il batchnorm nei conv (dim screenshot)
 #fare un confronto in 8 epoche con dropout e basth norm (screen)
 #Output layes is a dense layer of 10 nodes (as there are 10 classes woth softmax
+import json
 import pickle 
+import foolbox
 from matplotlib import pyplot as plt
 import os, sys, fnmatch
 import numpy as np
@@ -22,7 +24,8 @@ from keras.models import Sequential, Model, load_model, model_from_json
 from keras.utils.vis_utils import plot_model
 from keras import utils as np_utils, backend as K, regularizers
 from keras.layers.merge import add
-import json
+from keras import optimizers
+from sklearn.metrics import log_loss
 
 def unpickle_set(path, match, num_classes):
     res_data = np.empty((0,3072), np.uint8)
@@ -75,7 +78,6 @@ def save_data(model, history, epochs, batch_size, loss, acc, path):
     plot_model(model, to_file=path+'model_plot.png', show_shapes=True, show_layer_names=True)
 
 def numpytoimg(dataset, labels_mapping, index):
-    plt.clf()
     img = dataset['data'][index]
     filename = dataset['filenames'][index].decode('utf8')
     label_text = labels_mapping[np.argmax(dataset['labels'][index], axis=0)]
@@ -92,9 +94,9 @@ def show_intermediate_activation(model, dict_test):
     layer_outputs = [layer.output for layer in model.layers if layer.name == layer_name or layer_name is None][1:]
     activation_model = Model(inputs=model.input, outputs=layer_outputs) 
     img = np.expand_dims(dict_test['data'][0], axis=0)
-    activations = activation_model.predict(img)[:12]
+    activations = activation_model.predict(img)[-2:-1]
     print(len(activations))
-    for layer in layer_outputs[:12]:
+    for layer in layer_outputs[-2:-1]:
         layer_names.append(layer.name)
     images_per_row = 16
 
@@ -124,14 +126,17 @@ def show_intermediate_activation(model, dict_test):
         plt.imshow(display_grid, aspect='auto', cmap='viridis')
     plt.show()
 
+def fgsm():
+    pass
 
-def load_architecture(dict_test, labels_mapping):
+def load_architecture(path=None):
     path = "./models/Test_Loss:1.5046686241149902_Test_accuracy:0.5522_256_10/"
     with open(path+'model_in_json.json','r') as f:
         model_json = json.load(f)
     model = model_from_json(model_json)
     model.load_weights(path+'model_weigths.h5') #model_weights.h5
-    show_intermediate_activation(model, dict_test)
+    return model    
+
 '''
     layer_name = None
     layer_outputs = [layer.output for layer in model.layers if layer.name == layer_name or layer_name is None][1:]
@@ -156,13 +161,57 @@ def identity_block(input_tensor, kernel_size, filters, filters_out=-1):
     relu2 = Activation('relu')(norm2)
     conv3 = Conv2D(filters, kernel_size=(3,3), strides=(1,1), padding='same', kernel_initializer='he_normal', kernel_regularizer=regularizers.l2(0.0001))(relu2) 
     add1 = add([input_tensor, conv3])
-    norm3 = BatchNormalization(axis=3)(conv3)
+    norm3 = BatchNormalization()(add1)
     relu3 = Activation('relu')(norm3) 
     if filters_out != -1:
-        conv4 = Conv2D(filters_out, kernel_size=(1,1), strides=(1,1), padding='same', kernel_initializer='he_normal', kernel_regularizer=regularizers.l2(0.0001))(input_tensor) 
+        maxPool = MaxPool2D(pool_size=(2,2), strides=(2,2))(input_tensor)
+        conv4 = Conv2D(filters_out, kernel_size=(1,1), strides=(1,1), padding='same', kernel_initializer='he_normal', kernel_regularizer=regularizers.l2(0.0001))(maxPool) 
     else:
         conv4 = Conv2D(filters, kernel_size=(1,1), strides=(1,1), padding='same', kernel_initializer='he_normal', kernel_regularizer=regularizers.l2(0.0001))(relu3) 
     return conv4 
+
+def save_architecture(dict_train, dict_test, num_classes, labels_mapping):
+    #Architecture
+    input_tensor = Input((32, 32, 3))
+    x = Conv2D(32, kernel_size=(3,3), strides=(1,1), activation='relu', input_shape=dict_train['data'].shape[1:])(input_tensor) 
+    x = identity_block(x, 3, 32)
+    x = identity_block(x, 3, 32)
+    x = identity_block(x, 3, 32, 64)
+    x = identity_block(x, 3, 64)
+    x = identity_block(x, 3, 64)
+    x = identity_block(x, 3, 64, 128)
+    x = identity_block(x, 3, 128) 
+    x = identity_block(x, 3, 128) 
+    x = identity_block(x, 3, 128, 256)
+    x = identity_block(x, 3, 256) 
+    x = identity_block(x, 3, 256) 
+    x = BatchNormalization(axis=3)(x)
+    x = Activation('relu')(x)
+    x = MaxPool2D(pool_size=(2,2), strides=(2,2))(x)
+    x = Flatten()(x)
+    x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
+    x = Dropout(0.4)(x)
+    x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
+    x = Dropout(0.4)(x)
+    x = Dense(num_classes, activation='softmax')(x)
+    model = Model(inputs=input_tensor, outputs=x)
+    model.summary()
+    
+    opt = optimizers.Adam(lr = 0.0005, decay=1e-4) 
+    #compile model using accuracy to measure model performance
+    model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+
+    #train the model
+    batch_size = 256 
+    epochs = 80
+    history = model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=epochs, batch_size=batch_size, verbose=1) 
+
+    loss, acc = model.evaluate(dict_test['data'], dict_test['labels'])
+
+    print('Test loss:', loss)
+    print('Test accuracy:', acc)
+    save_data(model, history, epochs, batch_size, loss, acc, './models')
+    return model
 
 def main():
     #GPU checkup 
@@ -180,28 +229,50 @@ def main():
     print('Train Loaded..\n')
     dict_test = unpickle_set('./dataset/cifar-10-python/cifar-10-batches-py/', 'test_batch', num_classes)
     print('Test Loaded..\n')
-    #numpytoimg(dict_train, labels_mapping, 49999)
-    save_architecture(dict_train, dict_test, num_classes, labels_mapping)
-    #load_architecture(dict_test, labels_mapping)
+    #model = save_architecture(dict_train, dict_test, num_classes, labels_mapping)
 
-def save_architecture(dict_train, dict_test, num_classes, labels_mapping):
-    #Architecture
-    input_tensor = Input((32, 32, 3))
-    x = Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu', input_shape=dict_train['data'].shape[1:])(input_tensor) 
-    x = identity_block(x, 3, 32, 64)
-    x = MaxPool2D(pool_size=(2,2), strides=(2,2))(x)
-    x = identity_block(x, 3, 64, 128)
-    x = MaxPool2D(pool_size=(2,2), strides=(2,2))(x)
-    x = identity_block(x, 3, 128, 256)
-    x = MaxPool2D(pool_size=(2,2), strides=(2,2))(x)
-    x = identity_block(x, 3, 256)
-    x = Flatten()(x)
-    x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
-    x = Dropout(0.4)(x)
-    x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
-    x = Dropout(0.4)(x)
-    x = Dense(num_classes, activation='softmax')(x)
-    model = Model(inputs=input_tensor, outputs=x)
+    #printare la confidence sulle prediction
+    model = load_architecture()
+    #show_intermediate_activation(model, dict_test)
+    
+    preprocessing = (np.array([104, 116, 123]), 1)
+    fmodel = foolbox.models.KerasModel(model, bounds=(0, 255), preprocessing=preprocessing) 
+    img = np.expand_dims(dict_test['data'][0], axis=0)
+    print(dict_test['labels'][0])
+    y_t = model.predict(img) 
+    print("predicted_y:"+str(labels_mapping[np.argmax(y_t, axis=1)]))
+    print("fmodel "+str(np.argmax(fmodel.predictions(dict_test['data'][0])))) 
+    #numpytoimg(dict_test, labels_mapping, 0)
+
+    attack = foolbox.attacks.FGSM(fmodel)
+    adversarial = attack(dict_test['data'][0], label=np.argmax(dict_test['labels'][0], axis=0))
+    print(adversarial)
+    print(np.argmax(fmodel.predictions(adversarial)))
+    show_attack(dict_test['data'][0], adversarial) 
+
+def show_attack(image, adversarial):
+    plt.subplot(1, 3, 1)
+    plt.title('Original')
+    plt.imshow(image / 255)  # division by 255 to convert [0, 255] to [0, 1]
+    plt.axis('off')
+
+    plt.subplot(1, 3, 2)
+    plt.title('Adversarial')
+    plt.imshow(adversarial[:, :, ::-1] / 255)  # ::-1 to convert BGR to RGB
+    plt.axis('off')
+
+    plt.subplot(1, 3, 3)
+    plt.title('Difference')
+    difference = adversarial[:, :, ::-1] - image
+    plt.imshow(difference / abs(difference).max() * 0.2 + 0.5)
+    plt.axis('off')
+    plt.show()
+
+main()
+
+
+
+
 
 #    model = Sequential()
 #    model.add(Conv2D(32, kernel_size=(3,3), strides=(1,1), activation='relu', input_shape=dict_train['data'].shape[1:]))
@@ -229,22 +300,4 @@ def save_architecture(dict_train, dict_test, num_classes, labels_mapping):
 #    model.add(Dropout(0.4))
 #    model.add(Dense(num_classes, activation='softmax'))
 
-    model.summary()
-
-    #compile model using accuracy to measure model performance
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-
-    #train the model
-    batch_size = 256 
-    epochs = 135 
-    history = model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=epochs, batch_size=batch_size, verbose=1) 
-
-    loss, acc = model.evaluate(dict_test['data'], dict_test['labels'])
-
-    print('Test loss:', loss)
-    print('Test accuracy:', acc)
-    save_data(model, history, epochs, batch_size, loss, acc, './models')
-
-
-main()
 
