@@ -1,5 +1,3 @@
-
-#printare la confidence sulle prediction
 #It turns out that 1×1 conv can reduce the number of connections (parameters) while not degrading the performance of the network so much
 #éiù profonda la voglo fare, più problema del vanishing
 #Max pooling extracts the most important features like edges whereas, average pooling extracts features so smoothly. For image data, you can see the difference. Although both are used for same reason, I think max pooling is better for extracting the extreme features. 
@@ -24,9 +22,10 @@ import keras
 from keras.layers import Input, GlobalAveragePooling2D, BatchNormalization, Dropout, Conv2D, Activation, MaxPool2D, Flatten, Dense 
 from keras.models import Sequential, Model, load_model, model_from_json
 from keras.utils.vis_utils import plot_model
-from keras import optimizers
 from keras import utils as np_utils, backend as K, regularizers
 from keras.layers.merge import add
+from keras import optimizers
+from sklearn.metrics import log_loss
 
 def unpickle_set(path, match, num_classes):
     res_data = np.empty((0,3072), np.uint8)
@@ -88,24 +87,71 @@ def numpytoimg(dataset, labels_mapping, index):
     plt.imshow(img)
     plt.show()
 
-def show_attack(image, adversarial, true_label, adversarial_label):
-    plt.subplot(1, 3, 1)
-    plt.title('Original: '+true_label)
-    plt.imshow(image / 255) 
-    plt.axis('off')
 
-    plt.subplot(1, 3, 2)
-    plt.title('Difference')
-    difference = adversarial - image
-    plt.imshow(difference / abs(difference).max()*0.2+0.5)
-    plt.axis('off')
+def show_intermediate_activation(model, dict_test):
+    layer_names = []
+    layer_name = None
+    layer_outputs = [layer.output for layer in model.layers if layer.name == layer_name or layer_name is None][1:]
+    activation_model = Model(inputs=model.input, outputs=layer_outputs) 
+    img = np.expand_dims(dict_test['data'][0], axis=0)
+    activations = activation_model.predict(img)[-2:-1]
+    print(len(activations))
+    for layer in layer_outputs[-2:-1]:
+        layer_names.append(layer.name)
+    images_per_row = 16
 
-    plt.subplot(1, 3, 3)
-    plt.title('Adversarial: '+adversarial_label)
-    plt.imshow(adversarial / 255) 
-    plt.axis('off')
-
+    for layer_name, layer_activation in zip(layer_names, activations): # Displays the feature maps
+        n_features = layer_activation.shape[-1] # Number of features in the feature map
+        print(n_features//images_per_row)
+        size = layer_activation.shape[1] #The feature map has shape (1, size, size, n_features).
+        n_cols = n_features // images_per_row # Tiles the activation channels in this matrix
+        display_grid = np.zeros((size * n_cols, images_per_row * size))
+        print(display_grid)
+        for col in range(n_cols): # Tiles each filter into a big horizontal grid
+            for row in range(images_per_row):
+                channel_image = layer_activation[0,
+                        :, :,
+                        col * images_per_row + row]
+                channel_image -= channel_image.mean() # Post-processes the feature to make it visually palatable
+                channel_image /= channel_image.std()
+                channel_image *= 64
+                channel_image += 128
+                channel_image = np.clip(channel_image, 0, 255).astype('uint8')
+                display_grid[col * size : (col + 1) * size, # Displays the grid
+                    row * size : (row + 1) * size] = channel_image
+        scale = 1. / size
+        plt.figure(figsize=(scale * display_grid.shape[1], scale * display_grid.shape[0]))
+        plt.title(layer_name)
+        plt.grid(False)
+        plt.imshow(display_grid, aspect='auto', cmap='viridis')
     plt.show()
+
+def fgsm():
+    pass
+
+def load_architecture(path=None):
+    path = "./models/Test_Loss:1.5046686241149902_Test_accuracy:0.5522_256_10/"
+    with open(path+'model_in_json.json','r') as f:
+        model_json = json.load(f)
+    model = model_from_json(model_json)
+    model.load_weights(path+'model_weigths.h5') #model_weights.h5
+    return model    
+
+'''
+    layer_name = None
+    layer_outputs = [layer.output for layer in model.layers if layer.name == layer_name or layer_name is None][1:]
+    activation_model = Model(inputs=model.input, outputs=layer_outputs) 
+    img = np.expand_dims(dict_test['data'][0], axis=0)
+    print(img.shape)
+    activations = activation_model.predict(img) 
+    #print(activations)
+    #print(labels_mapping[np.argmax(activations, axis=1)])
+    #numpytoimg(dict_test, labels_mapping, 0)\:w
+    first_layer_activation = activations[4]
+    print(first_layer_activation.shape)
+    plt.matshow(first_layer_activation[0, :, :, 1], cmap='viridis')
+    plt.show()
+'''
 
 def identity_block(input_tensor, kernel_size, filters, filters_out=-1):
     norm = BatchNormalization(axis=3)(input_tensor)
@@ -124,74 +170,48 @@ def identity_block(input_tensor, kernel_size, filters, filters_out=-1):
         conv4 = Conv2D(filters, kernel_size=(1,1), strides=(1,1), padding='same', kernel_initializer='he_normal', kernel_regularizer=regularizers.l2(0.0001))(relu3) 
     return conv4 
 
-def load_architecture(path=None):
-    with open(path+'model_in_json.json','r') as f:
-        model_json = json.load(f)
-    model = model_from_json(model_json)
-    model.load_weights(path+'model_weights.h5') 
-    return model    
-
-
-def train_architecture(dict_train, dict_test, num_classes, labels_mapping, epochs=None, batch_size=None):
+def save_architecture(dict_train, dict_test, num_classes, labels_mapping):
     #Architecture
     input_tensor = Input((32, 32, 3))
-    x = Conv2D(32, kernel_size=(3,3), strides=(2,2), activation='relu', input_shape=dict_train['data'].shape[1:])(input_tensor) 
-    x = identity_block(x, 3, 32)
-    x = identity_block(x, 3, 32)
+    x = Conv2D(32, kernel_size=(3,3), strides=(1,1), activation='relu', input_shape=dict_train['data'].shape[1:])(input_tensor) 
     x = identity_block(x, 3, 32)
     x = identity_block(x, 3, 32)
     x = identity_block(x, 3, 32, 64)
     x = identity_block(x, 3, 64)
     x = identity_block(x, 3, 64)
-    x = identity_block(x, 3, 64)
-    x = identity_block(x, 3, 64)
     x = identity_block(x, 3, 64, 128)
     x = identity_block(x, 3, 128) 
     x = identity_block(x, 3, 128) 
-    x = identity_block(x, 3, 128) 
-    x = identity_block(x, 3, 128) 
+    x = identity_block(x, 3, 128, 256)
+    x = identity_block(x, 3, 256) 
+    x = identity_block(x, 3, 256) 
     x = BatchNormalization(axis=3)(x)
     x = Activation('relu')(x)
     x = MaxPool2D(pool_size=(2,2), strides=(2,2))(x)
     x = Flatten()(x)
     x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
-    x = Dropout(0.2)(x)
+    x = Dropout(0.4)(x)
     x = Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(0.01))(x)
-    x = Dropout(0.2)(x)
+    x = Dropout(0.4)(x)
     x = Dense(num_classes, activation='softmax')(x)
     model = Model(inputs=input_tensor, outputs=x)
-    
     model.summary()
     
     opt = optimizers.Adam(lr = 0.0005, decay=1e-4) 
+    #compile model using accuracy to measure model performance
     model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
 
+    #train the model
+    batch_size = 256 
+    epochs = 80
     history = model.fit(dict_train['data'], dict_train['labels'], validation_data=(dict_test['data'], dict_test['labels']), epochs=epochs, batch_size=batch_size, verbose=1) 
+
     loss, acc = model.evaluate(dict_test['data'], dict_test['labels'])
 
     print('Test loss:', loss)
     print('Test accuracy:', acc)
     save_data(model, history, epochs, batch_size, loss, acc, './models')
     return model
-
-def fast_gradient_sign_method(model, img, label, labels_mapping):
-    fmodel = foolbox.models.KerasModel(model, bounds=(0, 255))  
-
-    true_label = labels_mapping[np.argmax(label, axis=0)] 
-    predicted_label = labels_mapping[np.argmax(model.predict(np.expand_dims(img, axis=0)))] 
-    predicted_label_fmodel = labels_mapping[np.argmax(fmodel.predictions(img))]
-    print("true_label: "+str(true_label))
-    print("predicted_label: "+str(predicted_label))
-    print("predicted_label_fmodel: "+str(predicted_label_fmodel))
-
-    attack = foolbox.attacks.FGSM(fmodel)
-    adversarial = attack(img, label=np.argmax(label, axis=0))
-
-    adversarial_label = labels_mapping[np.argmax(fmodel.predictions(adversarial))]
-    print("--> adversarial_label: "+str(adversarial_label))
-
-    show_attack(img, adversarial, true_label, adversarial_label) 
-
 
 def main():
     #GPU checkup 
@@ -204,26 +224,81 @@ def main():
     labels_mapping = unpickle_label('./dataset/cifar-10-python/cifar-10-batches-py/batches.meta')
     num_classes = len(labels_mapping)
     print('Mapping Loaded..\n')
+    print('N° classes: '+str(num_classes))
     dict_train = unpickle_set('./dataset/cifar-10-python/cifar-10-batches-py/', 'data_batch_*', num_classes)
     print('Train Loaded..\n')
     dict_test = unpickle_set('./dataset/cifar-10-python/cifar-10-batches-py/', 'test_batch', num_classes)
     print('Test Loaded..\n')
-    print('N° classes: '+str(num_classes))
+    model = save_architecture(dict_train, dict_test, num_classes, labels_mapping)
 
-    #Train Model
-#    model = train_architecture(dict_train, dict_test, num_classes, labels_mapping, epochs=sys.argv[1], batch_size=sys.argv[2])
-#    model = load_architecture('./models/Test_Loss:1.5046686241149902_Test_accuracy:0.5522_256_10/')
-
-    #Load Model
-    model = load_architecture('./models/Test_Loss:1.6799632623672485_Test_accuracy:0.7591_256_80/')
-
-    #FastGradientSign Attack
-    fast_gradient_sign_method(model, dict_test['data'][0], dict_test['labels'][0], labels_mapping)
-
+'''
+    #printare la confidence sulle prediction
+    model = load_architecture()
+    #show_intermediate_activation(model, dict_test)
     
+    preprocessing = (np.array([104, 116, 123]), 1)
+    fmodel = foolbox.models.KerasModel(model, bounds=(0, 255), preprocessing=preprocessing) 
+    img = np.expand_dims(dict_test['data'][0], axis=0)
+    print(dict_test['labels'][0])
+    y_t = model.predict(img) 
+    print("predicted_y:"+str(labels_mapping[np.argmax(y_t, axis=1)]))
+    print("fmodel "+str(np.argmax(fmodel.predictions(dict_test['data'][0])))) 
+    #numpytoimg(dict_test, labels_mapping, 0)
+
+    attack = foolbox.attacks.FGSM(fmodel)
+    adversarial = attack(dict_test['data'][0], label=np.argmax(dict_test['labels'][0], axis=0))
+    print(adversarial)
+    print(np.argmax(fmodel.predictions(adversarial)))
+    show_attack(dict_test['data'][0], adversarial) 
+'''
+def show_attack(image, adversarial):
+    plt.subplot(1, 3, 1)
+    plt.title('Original')
+    plt.imshow(image / 255)  # division by 255 to convert [0, 255] to [0, 1]
+    plt.axis('off')
+
+    plt.subplot(1, 3, 2)
+    plt.title('Adversarial')
+    plt.imshow(adversarial[:, :, ::-1] / 255)  # ::-1 to convert BGR to RGB
+    plt.axis('off')
+
+    plt.subplot(1, 3, 3)
+    plt.title('Difference')
+    difference = adversarial[:, :, ::-1] - image
+    plt.imshow(difference / abs(difference).max() * 0.2 + 0.5)
+    plt.axis('off')
+    plt.show()
+
 main()
 
 
 
+
+
+#    model = Sequential()
+#    model.add(Conv2D(32, kernel_size=(3,3), strides=(1,1), activation='relu', input_shape=dict_train['data'].shape[1:]))
+#    model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))
+#    model.add(BatchNormalization()) 
+#    
+#    model.add(Conv2D(64, kernel_size=(3,3), strides=(1,1), activation='relu'))
+#    model.add(Conv2D(64, kernel_size=(3,3), strides=(1,1), activation='relu'))
+#    model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))  
+#    model.add(BatchNormalization()) 
+#    
+#    model.add(Conv2D(128, kernel_size=(3,3), strides=(2,2), activation='relu'))
+#    model.add(Conv2D(128, kernel_size=(3,3), strides=(1,1), activation='relu'))
+#    model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))  
+#    model.add(BatchNormalization()) 
+#     
+#    model.add(Conv2D(256, kernel_size=(3,3), strides=(1,1), activation='relu'))
+#    model.add(Conv2D(256, kernel_size=(3,3), strides=(1,1), activation='relu'))
+#    model.add(MaxPool2D(pool_size=(2,2), strides=(1,1)))  
+#    model.add(BatchNormalization()) 
+    
+    
+#    model.add(Flatten())
+#    model.add(Dense(512, activation='relu'))
+#    model.add(Dropout(0.4))
+#    model.add(Dense(num_classes, activation='softmax'))
 
 
